@@ -1,13 +1,16 @@
 ﻿using System;
 using System.IO;
-using System.Diagnostics;
+using CalculatingFunctions;
 using System.Threading;
+using System.Text.Json;
+using System.Diagnostics;
 
 class Program
 {
-    static double[] data = Array.Empty<double>();
-    static double finalResult = 0;
+    static decimal[] data = Array.Empty<decimal>();
+    static decimal result = 0;
     static int threadCount = Environment.ProcessorCount;
+    private static object lockObj = new object();
 
     private static void LoadData()
     {
@@ -16,46 +19,33 @@ class Program
         using (BinaryReader br = new BinaryReader(fs))
         {
             int len = (int)(fs.Length / sizeof(float));
-            data = new double[len];
+            data = new decimal[len];
             for (int i = 0; i < len; i++)
             {
                 float f = br.ReadSingle();
-                data[i] = f * 36.0;
+                data[i] = (decimal)f * 36.0m;
             }
         }
         Console.WriteLine("Data loaded successfully.\n");
     }
 
-    private static double Calculate(double value)
+    private static void ThreadWork(int startIndex, int endIndex)
     {
-        double sum;
-        int iv = (int)value;
+        CalClass CF = new CalClass();
+        decimal localResult = 0;
 
-        if ((iv & 1) == 0) sum = value * 0.002;
-        else if (iv % 3 == 0) sum = value * 0.003;
-        else if (iv % 5 == 0) sum = value * 0.005;
-        else if (iv % 7 == 0) sum = value * 0.007;
-        else sum = value * 0.001;
-
-        return (((long)sum & 1) == 0 ? sum : -sum) * 0.00001;
-    }
-
-    private static void Worker(int start, int end)
-    {
-        double localResult = 0;
-        for (int loop = 0; loop < 30; loop++)
+        for (int i = 0; i < 30; i++)
         {
-            for (int i = start; i < end; i++)
+            int index = startIndex;
+            while (index < endIndex)
             {
-                localResult += Calculate(data[i]);
-                data[i] *= 0.1;
+                localResult += CF.Calculate1(ref data, ref index);
             }
         }
 
-        // Combine results safely
-        lock (typeof(Program))
+        lock (lockObj)
         {
-            finalResult += localResult;
+            result += localResult;
         }
     }
 
@@ -74,7 +64,7 @@ class Program
             int start = t * chunkSize;
             int end = (t == threadCount - 1) ? data.Length : start + chunkSize;
 
-            threads[t] = new Thread(() => Worker(start, end));
+            threads[t] = new Thread(() => ThreadWork(start, end));
             threads[t].Start();
         }
 
@@ -85,6 +75,6 @@ class Program
 
         sw.Stop();
         Console.WriteLine($"Thread : {threadCount}");
-        Console.WriteLine($"Calculation finished in {sw.ElapsedMilliseconds} ms. Result: {finalResult:F25}");
+        Console.WriteLine($"Calculation finished in {sw.ElapsedMilliseconds} ms. Result: {result:F25}");
     }
 }
