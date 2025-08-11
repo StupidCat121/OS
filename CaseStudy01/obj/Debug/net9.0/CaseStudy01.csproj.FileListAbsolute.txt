@@ -32,3 +32,4 @@ E:\OS\CaseStudy01\obj\Debug\net9.0\refint\CaseStudy01.dll
 E:\OS\CaseStudy01\obj\Debug\net9.0\CaseStudy01.pdb
 E:\OS\CaseStudy01\obj\Debug\net9.0\CaseStudy01.genruntimeconfig.cache
 E:\OS\CaseStudy01\obj\Debug\net9.0\ref\CaseStudy01.dll
+E:\OS\CaseStudy01\obj\Debug\net9.0\CaseStudy01.sourcelink.json

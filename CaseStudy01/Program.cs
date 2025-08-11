@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Diagnostics;
-using System.Threading.Tasks;
+using System.Threading;
 
 class Program
 {
     static double[] data = Array.Empty<double>();
+    static double finalResult = 0;
+    static int threadCount = Environment.ProcessorCount;
 
     private static void LoadData()
     {
@@ -38,6 +40,25 @@ class Program
         return (((long)sum & 1) == 0 ? sum : -sum) * 0.00001;
     }
 
+    private static void Worker(int start, int end)
+    {
+        double localResult = 0;
+        for (int loop = 0; loop < 30; loop++)
+        {
+            for (int i = start; i < end; i++)
+            {
+                localResult += Calculate(data[i]);
+                data[i] *= 0.1;
+            }
+        }
+
+        // Combine results safely
+        lock (typeof(Program))
+        {
+            finalResult += localResult;
+        }
+    }
+
     private static void Main(string[] args)
     {
         LoadData();
@@ -45,35 +66,25 @@ class Program
 
         Stopwatch sw = Stopwatch.StartNew();
 
-        double finalResult = 0;
+        Thread[] threads = new Thread[threadCount];
+        int chunkSize = data.Length / threadCount;
 
-        Parallel.For(0, Environment.ProcessorCount, core =>
+        for (int t = 0; t < threadCount; t++)
         {
-            double localResult = 0;
-            int chunkSize = data.Length / Environment.ProcessorCount;
-            int start = core * chunkSize;
-            int end = (core == Environment.ProcessorCount - 1) ? data.Length : start + chunkSize;
+            int start = t * chunkSize;
+            int end = (t == threadCount - 1) ? data.Length : start + chunkSize;
 
-            Console.WriteLine(Environment.ProcessorCount > 1
-                ? $"Core {core} processing data from index {start} to {end - 1}."
-                : "Single core processing.");
-                
-            for (int loop = 0; loop < 30; loop++)
-            {
-                for (int i = start; i < end; i++)
-                {
-                    localResult += Calculate(data[i]);
-                    data[i] *= 0.1;
-                }
-            }
+            threads[t] = new Thread(() => Worker(start, end));
+            threads[t].Start();
+        }
 
-            lock (typeof(Program))
-            {
-                finalResult += localResult;
-            }
-        });
+        for (int t = 0; t < threadCount; t++)
+        {
+            threads[t].Join();
+        }
 
         sw.Stop();
+        Console.WriteLine($"Thread : {threadCount}");
         Console.WriteLine($"Calculation finished in {sw.ElapsedMilliseconds} ms. Result: {finalResult:F25}");
     }
 }
